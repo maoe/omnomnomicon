@@ -152,7 +152,7 @@ pub trait Updater {
     ///
     /// error messages look like
     /// "message"/field/AdjConfig/TraderConfig
-    fn check(&self, errors: &mut Vec<String>);
+    fn check(&self, _errors: &mut Vec<String>) {}
 }
 
 impl<T> Updater for T
@@ -170,8 +170,6 @@ where
     fn apply(&mut self, updater: Self::Updater, _errors: &mut Vec<String>) {
         *self = updater;
     }
-    // nothing to do here
-    fn check(&self, _errors: &mut Vec<String>) {}
 }
 
 impl<T: Parser + Clone + std::fmt::Debug> Updater for Option<T> {
@@ -190,8 +188,6 @@ impl<T: Parser + Clone + std::fmt::Debug> Updater for Option<T> {
     fn apply(&mut self, updater: Self::Updater, _errors: &mut Vec<String>) {
         *self = updater;
     }
-
-    fn check(&self, _errors: &mut Vec<String>) {}
 }
 
 /// used to add a suffix to every new error
@@ -225,8 +221,6 @@ impl<T: Updater + std::fmt::Debug, const N: usize> Updater for [T; N] {
         self[updater.0].apply(updater.1, errors);
         suffix_errors(before, errors, &format!("[{}]", updater.0));
     }
-
-    fn check(&self, _errors: &mut Vec<String>) {}
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
@@ -297,8 +291,6 @@ impl<T: Updater<Updater = T> + Parser + std::fmt::Debug> Updater for Vec<T> {
         }
         suffix_errors(before, errors, &format!("[{:?}]", index));
     }
-
-    fn check(&self, _errors: &mut Vec<String>) {}
 }
 
 #[cfg(feature = "enum-map")]
@@ -322,8 +314,6 @@ where
         self[key].apply(updater, errors);
         suffix_errors(before, errors, &format!("[{:?}]", key));
     }
-
-    fn check(&self, _errors: &mut Vec<String>) {}
 }
 
 #[test]
