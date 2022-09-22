@@ -81,7 +81,10 @@ where
     }
 }
 
-impl<T: Updater<Updater = T> + Parser + std::fmt::Debug> Checker for Vec<T> {
+impl<T> Checker for Vec<T>
+where
+    T: Updater<Updater = T> + Parser + std::fmt::Debug,
+{
     type Item = T;
 
     fn element_check<C>(
@@ -106,6 +109,27 @@ impl<T: Updater<Updater = T> + Parser + std::fmt::Debug> Checker for Vec<T> {
             }
             UpdateOrInsert::Del(_) | UpdateOrInsert::Ins(_, _) => Ok(()),
         }
+    }
+}
+
+#[cfg(feature = "enum-map")]
+impl<K, V> Checker for enum_map::EnumMap<K, V>
+where
+    K: enum_map::EnumArray<V> + Copy + std::fmt::Debug,
+    V: Updater<Updater = V>,
+{
+    type Item = <V as Updater>::Updater;
+
+    fn element_check<C>(
+        &self,
+        (k, new): &Self::Updater,
+        check: &C,
+    ) -> std::result::Result<(), String>
+    where
+        C: Fn(&Self::Item, &Self::Item) -> std::result::Result<(), String>,
+    {
+        let current = &self[*k];
+        check(current, new)
     }
 }
 

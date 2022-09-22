@@ -575,4 +575,7 @@ pub struct Config2 {
     pub left: bool,
     #[om(no_check)]
     pub right: bool,
+    #[cfg(feature = "enum-map")]
+    #[om(enter, check(ten_percent))]
+    pub items2: EnumMap<Key, u32>,
 }
