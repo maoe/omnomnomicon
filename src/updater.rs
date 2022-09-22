@@ -60,6 +60,27 @@ pub trait Checker: Updater {
         C: Fn(&Self::Item, &Self::Item) -> std::result::Result<(), String>;
 }
 
+impl<T> Checker for Option<T>
+where
+    T: Updater<Updater = T> + Parser + std::fmt::Debug + Clone,
+{
+    type Item = T;
+
+    fn element_check<C>(
+        &self,
+        updater: &Self::Updater,
+        check: &C,
+    ) -> std::result::Result<(), String>
+    where
+        C: Fn(&Self::Item, &Self::Item) -> std::result::Result<(), String>,
+    {
+        if let (Some(current), Some(new)) = (self, updater) {
+            check(current, new)?;
+        }
+        Ok(())
+    }
+}
+
 impl<T: Updater<Updater = T> + Parser + std::fmt::Debug> Checker for Vec<T> {
     type Item = T;
 
