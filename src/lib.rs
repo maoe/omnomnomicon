@@ -52,7 +52,7 @@ pub mod utils;
 pub use crate::state::*;
 pub mod editor;
 pub mod tests;
-pub use crate::updater::Updater;
+pub use crate::updater::{Checker, Updater};
 pub use omnomnomicon_derive::{Parser, Updater};
 
 /// A trait to parse an item in a generic way
