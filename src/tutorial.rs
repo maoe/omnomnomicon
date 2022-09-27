@@ -378,7 +378,7 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone, omnomnomicon::Parser)]
-pub struct Price(u32);
+pub struct Price(#[om(sanity_check(odd))] u32);
 
 fn percent(percent: f64) -> impl Fn(&u32, &u32) -> std::result::Result<(), String> {
     move |orig: &u32, new: &u32| {
@@ -395,6 +395,15 @@ fn ten_percent(orig: &u32, new: &u32) -> std::result::Result<(), String> {
     percent(10.0)(orig, new)
 }
 
+fn greater_than_or_equal_to(lower_bound: u32) -> impl Fn(&u32) -> std::result::Result<(), String> {
+    move |x| {
+        if lower_bound < *x {
+            return Err("must be positive".into());
+        }
+        Ok(())
+    }
+}
+
 /// top level structure, most of the fields are accessible directly, nested fields are accessible
 /// via `.`.
 ///
@@ -405,7 +414,7 @@ pub struct Config {
     /// Price...
     #[om(check(|cur, new| ten_percent(&cur.0, &new.0)))]
     pub price: Price,
-    #[om(check(percent(15.0)))]
+    #[om(check(percent(15.0)), sanity_check(greater_than_or_equal_to(5)))]
     pub target: u32,
 
     #[om(enter, check(ten_percent))]
@@ -423,7 +432,7 @@ pub struct Config {
     #[om(enter)]
     pub enum_map: EnumMap<Key, u32>,
 
-    #[om(no_check)]
+    #[om(enter)]
     pub mystery: Mystery,
 }
 
@@ -489,12 +498,12 @@ fn odd(val: &u32) -> std::result::Result<(), String> {
 
 #[derive(Debug, Copy, Clone, Parser)]
 /// Performs a mystery transformation, should be an odd number
-pub struct Mystery(#[om(check(odd))] pub u32);
+pub struct Mystery(#[om(sanity_check(odd))] pub u32);
 
 #[derive(Debug, Copy, Clone, Parser)]
 /// Performs a mystery transformation, should be an even number
 pub struct Magical {
-    #[om(check(even))]
+    #[om(sanity_check(even))]
     pub value: u32,
 }
 

@@ -52,7 +52,7 @@ impl Parse for CheckAttr {
             let _ = parenthesized!(content in input);
             Ok(CheckAttr(content.parse()?))
         } else {
-            Err(input_copy.error("Unknown keyword"))
+            Err(input_copy.error(format!("Unknown keyword: {name}")))
         }
     }
 }
@@ -61,10 +61,14 @@ pub enum Attr {
     Skip,
     Literal(String),
     Via(Ident),
+    /// Sanity check for a field value
+    SanityCheck(Box<Expr>),
+    /// Check for an update of a value
     Check(Box<Expr>),
     Enter,
     Okay,
 }
+
 impl Parse for Attr {
     fn parse(input: parse::ParseStream) -> Result<Self> {
         let input_copy = input.fork();
@@ -82,6 +86,10 @@ impl Parse for Attr {
             let content;
             let _ = parenthesized!(content in input);
             Ok(Attr::Via(content.parse()?))
+        } else if name == "sanity_check" {
+            let content;
+            let _ = parenthesized!(content in input);
+            Ok(Attr::SanityCheck(content.parse()?))
         } else if name == "check" {
             let content;
             let _ = parenthesized!(content in input);
@@ -89,7 +97,7 @@ impl Parse for Attr {
         } else if name == "enter" {
             Ok(Attr::Enter)
         } else {
-            Err(input_copy.error("Unknown keyword"))
+            Err(input_copy.error(format!("Unknown keyword: {name}")))
         }
     }
 }

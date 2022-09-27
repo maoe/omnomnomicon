@@ -28,23 +28,23 @@ fn simple_struct_impl(simple: SimpleStruct) -> Result<TokenStream> {
         Some(name) => quote!(#name),
         None => quote!(0),
     };
-    let check = match simple.check {
-        Some(check) => quote! {
-            fn sanity_check(&self, errors: &mut Vec<String>) {
-                let check_fn: &dyn Fn(&#ty) -> std::result::Result<(), String> = &#check;
-                if let Err(msg) = check_fn(&self.#field_accessor) {
-                    errors.push(msg);
-                }
+    let checks = simple.sanity_checks.iter().map(|check| {
+        quote! {
+            let check_fn: &dyn Fn(&#ty) -> std::result::Result<(), String> = &#check;
+            if let Err(msg) = check_fn(&self.#field_accessor) {
+                errors.push(msg);
             }
-        },
-        None => quote!(),
-    };
+        }
+    });
+
     let r = quote! {
         impl #_crate::Parser for #struct_ident {
             fn parse(input: &str) -> #_crate::Result<Self> {
                 #p(input)
             }
-            #check
+            fn sanity_check(&self, errors: &mut Vec<String>) {
+                #(#checks)*
+            }
         }
     };
     //println!("{:?}", r);
@@ -118,7 +118,7 @@ pub struct SimpleStruct {
     ty: Type,
     /// help message, if any
     help: Option<String>,
-    check: Option<Expr>,
+    sanity_checks: Vec<Expr>,
 }
 
 #[derive(Debug)]
@@ -171,7 +171,7 @@ impl Parse for SimpleStruct {
         let content;
         let ty;
         let field_name;
-        let mut check = None;
+        let mut sanity_checks = vec![];
         if lookahead.peek(token::Paren) {
             let _paren = parenthesized!(content in input);
 
@@ -184,7 +184,10 @@ impl Parse for SimpleStruct {
                             Attr::Skip => {}
                             Attr::Literal(_) => {}
                             Attr::Via(_) => {}
-                            Attr::Check(expr) => check = Some(*expr),
+                            Attr::SanityCheck(expr) => sanity_checks.push(*expr),
+                            Attr::Check(_) => {
+                                return Err(Error::new(attr.span(), "unexpected attribute"));
+                            }
                             Attr::Enter => {}
                             Attr::Okay => {}
                         }
@@ -209,7 +212,13 @@ impl Parse for SimpleStruct {
                             Attr::Skip => {}
                             Attr::Literal(_) => {}
                             Attr::Via(_) => {}
-                            Attr::Check(expr) => check = Some(*expr),
+                            Attr::SanityCheck(expr) => sanity_checks.push(*expr),
+                            Attr::Check(expr) => {
+                                return Err(Error::new(
+                                    attr.span(),
+                                    format!("unexpected attribute {expr:?}"),
+                                ));
+                            }
                             Attr::Enter => {}
                             Attr::Okay => {}
                         }
@@ -237,7 +246,7 @@ impl Parse for SimpleStruct {
             } else {
                 Some(docs.join("\n"))
             },
-            check,
+            sanity_checks,
         })
     }
 }
@@ -278,6 +287,7 @@ impl Parse for SimpleEnumField {
                         Attr::Skip => skip = true,
                         Attr::Literal(lit) => literal = Some(lit),
                         Attr::Via(x) => via = Some(x),
+                        Attr::SanityCheck(_) => {}
                         Attr::Check(_) => {}
                         Attr::Enter => {}
                         Attr::Okay => {}

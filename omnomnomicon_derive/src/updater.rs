@@ -65,7 +65,7 @@ pub fn derive_updater_impl(omnom: OStruct) -> Result<TokenStream> {
             ..
         } = f;
 
-        let checks = f.checks.iter().flatten().map(|check| {
+        let checks = f.checks.iter().map(|check| {
             if *enter {
                 quote! {
                     if let Err(msg) = self.#ident.element_check(&f, &#check) {
@@ -114,8 +114,29 @@ pub fn derive_updater_impl(omnom: OStruct) -> Result<TokenStream> {
         let OField { ident, .. } = f;
         quote! { self.#ident.check(errors); }
     });
+
+    let field_sanity_checks = fields
+        .iter()
+        .filter(|&f| !f.skip && !f.enter && !f.no_check)
+        .flat_map(|&f| {
+            let OField {
+                ident,
+                ty,
+                sanity_checks,
+                ..
+            } = f;
+            sanity_checks.iter().map(move |sanity_check| {
+                quote! {
+                    let check_fn: &dyn Fn(&#ty) -> std::result::Result<(), String> = &#sanity_check;
+                    if let Err(msg) = check_fn(&self.#ident) {
+                        errors.push(msg);
+                    }
+                }
+            })
+        });
+
     let parser_checks = fields.iter().filter_map(|&f| {
-        if f.skip || f.enter || f.checks.is_none() {
+        if f.skip || f.enter || f.no_check {
             return None;
         }
         let OField { ident, .. } = f;
@@ -135,6 +156,7 @@ pub fn derive_updater_impl(omnom: OStruct) -> Result<TokenStream> {
                 let before = errors.len();
                 #(#top_level_checks)*
                 #(#child_checks)*
+                #(#field_sanity_checks)*
                 use omnomnomicon::Parser;
                 #(#parser_checks)*
                 #_crate::suffix_errors(before, errors, #name);
@@ -168,8 +190,9 @@ struct OField {
     docs: Option<String>,
     /// whether to skip
     skip: bool,
-    /// None when "no_check" is specified
-    checks: Option<Vec<Expr>>,
+    no_check: bool,
+    sanity_checks: Vec<Expr>,
+    checks: Vec<Expr>,
     enter: bool,
 }
 
@@ -208,9 +231,10 @@ impl Parse for OStruct {
 
 impl Parse for OField {
     fn parse(input: parse::ParseStream) -> Result<Self> {
-        let mut docs = Vec::new();
+        let mut docs = vec![];
         let mut skip = false;
-        let mut checks = Vec::new();
+        let mut sanity_checks = vec![];
+        let mut checks = vec![];
         let mut enter = false;
         let mut no_check = false;
         for attr in input.call(Attribute::parse_outer)? {
@@ -224,7 +248,8 @@ impl Parse for OField {
                 {
                     match a {
                         Attr::Skip => skip = true,
-                        Attr::Check(upd) => checks.push(*upd),
+                        Attr::SanityCheck(expr) => sanity_checks.push(*expr),
+                        Attr::Check(expr) => checks.push(*expr),
                         Attr::Literal(_) | Attr::Via(_) => {
                             return Err(Error::new(attr.span(), "unexpected attribute"))
                         }
@@ -237,7 +262,7 @@ impl Parse for OField {
 
         let field = Field::parse_named(input)?;
 
-        if !(enter || !checks.is_empty() || skip || no_check) {
+        if !(enter || !checks.is_empty() || !sanity_checks.is_empty() || skip || no_check) {
             return Err(Error::new(
                 field.span(),
                 "You need to specify one of `enter`, `check`, `no_check` or `skip` attribute",
@@ -260,7 +285,9 @@ impl Parse for OField {
             ident,
             variant,
             skip,
-            checks: if no_check { None } else { Some(checks) },
+            no_check,
+            sanity_checks,
+            checks,
             enter,
         })
     }
