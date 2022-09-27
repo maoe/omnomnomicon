@@ -135,6 +135,7 @@ pub fn derive_updater_impl(omnom: OStruct) -> Result<TokenStream> {
                 let before = errors.len();
                 #(#top_level_checks)*
                 #(#child_checks)*
+                use omnomnomicon::Parser;
                 #(#parser_checks)*
                 #_crate::suffix_errors(before, errors, #name);
             }
