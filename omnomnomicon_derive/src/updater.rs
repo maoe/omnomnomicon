@@ -65,7 +65,7 @@ pub fn derive_updater_impl(omnom: OStruct) -> Result<TokenStream> {
             ..
         } = f;
 
-        let checks = f.checks.iter().map(|check| {
+        let checks = f.checks.iter().flatten().map(|check| {
             if *enter {
                 quote! {
                     if let Err(msg) = self.#ident.element_check(&f, &#check) {
@@ -115,7 +115,7 @@ pub fn derive_updater_impl(omnom: OStruct) -> Result<TokenStream> {
         quote! { self.#ident.check(errors); }
     });
     let parser_checks = fields.iter().filter_map(|&f| {
-        if f.skip || f.enter {
+        if f.skip || f.enter || f.checks.is_none() {
             return None;
         }
         let OField { ident, .. } = f;
@@ -167,7 +167,8 @@ struct OField {
     docs: Option<String>,
     /// whether to skip
     skip: bool,
-    checks: Vec<Expr>,
+    /// None when "no_check" is specified
+    checks: Option<Vec<Expr>>,
     enter: bool,
 }
 
@@ -258,7 +259,7 @@ impl Parse for OField {
             ident,
             variant,
             skip,
-            checks,
+            checks: if no_check { None } else { Some(checks) },
             enter,
         })
     }
