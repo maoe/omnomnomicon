@@ -569,7 +569,7 @@ mod test {
         }
 
         fn even_i64(x: &i64) -> Result<()> {
-            if x % 2 == 1 {
+            if x % 2 == 0 {
                 return Err("This must be even".into());
             }
             Ok(())
