@@ -605,6 +605,29 @@ mod test {
             #[om(check(Baz::positive))]
             baz: Baz,
         }
+
+        let bar = Bar(-1);
+        let mut errors = vec![];
+        bar.check(&mut errors);
+        assert_eq!(errors, vec!["This must be even, Bar"]);
+
+        let baz = Baz { inner: -1 };
+        let mut errors = vec![];
+        baz.check(&mut errors);
+        assert_eq!(errors, vec!["This must be even, inner, Baz"]);
+
+        let foo = Foo { bar, baz };
+        let mut errors = vec![];
+        foo.check(&mut errors);
+        assert_eq!(
+            errors,
+            vec![
+                "This must be positive, bar, Foo",
+                "This must be even, Bar, bar Foo",
+                "This must be positive, baz, Foo",
+                "This must be even, inner, Baz, baz, Foo"
+            ]
+        );
     }
 
     #[test]
